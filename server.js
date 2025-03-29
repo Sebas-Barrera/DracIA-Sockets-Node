@@ -26,12 +26,12 @@ const wss = new WebSocket.Server({
 
 // Configuración para almacenamiento de alertas
 const CONFIG = {
-    MAX_ALERTAS: 100,               // Máximo de alertas a almacenar
-    UMBRAL_MINIMO_CONFIANZA: 0.3,   // Confianza mínima para procesar
-    TIEMPO_CONEXION_PERDIDA: 30000, // Considerar conexión perdida después de 30 segundos
-    TIEMPO_PING: 15000,             // Enviar ping cada 15 segundos
+    MAX_ALERTAS: 100,
+    UMBRAL_MINIMO_CONFIANZA: 0.3,
+    TIEMPO_CONEXION_PERDIDA: 90000,  // 90 segundos (antes 60)
+    TIEMPO_PING: 30000,              // 30 segundos (mantener)
     RUTA_LOGS: path.join(__dirname, 'logs'),
-    GUARDAR_LOGS: true              // Guardar logs en archivo
+    GUARDAR_LOGS: true
 };
 
 // Crear carpeta de logs si no existe
@@ -48,7 +48,8 @@ const clientes = new Map(); // Usar Map para almacenar metadata adicional
 // Registro de actividad del servidor
 function log(mensaje, tipo = 'info') {
     const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] [${tipo.toUpperCase()}] ${mensaje}`;
+    const tipoFormateado = tipo.toUpperCase().padEnd(8);
+    const logEntry = `[${timestamp}] [${tipoFormateado}] ${mensaje}`;
     
     console.log(logEntry);
     
@@ -188,7 +189,7 @@ wss.on('connection', (ws, req) => {
                 
                 // Añadir la alerta al historial
                 alertas.push(data);
-                log(`Alerta añadida: ${data.tipo} con confianza: ${data.confianza.toFixed(2)}`);
+                log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza.toFixed(2)}, Ubicación: ${data.ubicacion || 'desconocida'}`);
                 
                 // Limitar el historial
                 if (alertas.length > CONFIG.MAX_ALERTAS) {
@@ -259,9 +260,10 @@ const intervalPing = setInterval(() => {
         }
         
         ws.isAlive = false;
-        ws.ping(() => {});
+        ws.ping(() => {});  // Esto envía el ping
     });
 }, CONFIG.TIEMPO_PING);
+
 
 // Limpiar el intervalo cuando el servidor se cierre
 wss.on('close', () => {
@@ -274,6 +276,9 @@ function broadcastAlerta(alerta) {
     let clientesApp = 0;
     let clientesPython = 0;
     let clientesActivos = 0;
+    
+    // Nuevo log para mostrar el tipo de alerta
+    log(`Procesando alerta de tipo: ${alerta.tipo} con confianza: ${alerta.confianza.toFixed(2)}`, 'alerta');
     
     clientes.forEach((info, cliente) => {
         if (cliente.readyState === WebSocket.OPEN) {
