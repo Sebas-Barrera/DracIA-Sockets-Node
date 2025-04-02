@@ -189,7 +189,18 @@ wss.on('connection', (ws, req) => {
                 
                 // Añadir la alerta al historial
                 alertas.push(data);
-                log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza.toFixed(2)}, Ubicación: ${data.ubicacion || 'desconocida'}`);
+                if (data.ubicacion) {
+                    if (typeof data.ubicacion === 'string') {
+                        log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza}, Ubicación: ${data.ubicacion}`);
+                    } else if (data.ubicacion.latitude && data.ubicacion.longitude) {
+                        const dir = data.ubicacion.direccion || 'Ubicación sin dirección';
+                        log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza.toFixed(2)}, Ubicación: ${dir} (${data.ubicacion.latitude}, ${data.ubicacion.longitude})`);
+                    } else {
+                        log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza}, Ubicación: Datos incompletos`);
+                    }
+                } else {
+                    log(`Nueva alerta recibida - Tipo: ${data.tipo}, Confianza: ${data.confianza}, Ubicación: No especificada`);
+                }
                 
                 // Limitar el historial
                 if (alertas.length > CONFIG.MAX_ALERTAS) {
@@ -278,7 +289,13 @@ function broadcastAlerta(alerta) {
     let clientesActivos = 0;
     
     // Nuevo log para mostrar el tipo de alerta
-    log(`Procesando alerta de tipo: ${alerta.tipo} con confianza: ${alerta.confianza.toFixed(2)}`, 'alerta');
+    const ubicacionStr = alerta.ubicacion ? 
+    (typeof alerta.ubicacion === 'string' ? 
+        alerta.ubicacion : 
+        `${alerta.ubicacion.direccion || 'Sin dirección'} (${alerta.ubicacion.latitude}, ${alerta.ubicacion.longitude})`
+    ) : 'Ubicación no especificada';
+
+    log(`Procesando alerta - Tipo: ${alerta.tipo}, Confianza: ${alerta.confianza.toFixed(2)}, Ubicación: ${ubicacionStr}`, 'alerta');
     
     clientes.forEach((info, cliente) => {
         if (cliente.readyState === WebSocket.OPEN) {
